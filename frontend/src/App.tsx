@@ -11,6 +11,8 @@ import Notifications from './pages/Notifications'
 import Analytics from './pages/Analytics'
 import NotFound from './pages/NotFound'
 import { Toaster } from 'react-hot-toast'
+import RagChat from './pages/RagChat'
+
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuthStore()
@@ -56,7 +58,10 @@ function App() {
           <Route path="ai-systems" element={<AISystems />} />
           <Route path="classification/:systemId?" element={<Classification />} />
           <Route path="documents" element={<Documents />} />
+          <Route path="rag-chat" element={<RagChat />} />
           <Route path="notifications" element={<Notifications />} />
+          <Route path="rag-chat" element={<RagChat />} />
+
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
