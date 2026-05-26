@@ -181,6 +181,7 @@ def scan_prompt(
     request: ScanRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Scan a prompt for injection risks.
@@ -221,7 +222,7 @@ def scan_prompt(
             result,
         )
 
-        return ScanResponse(
+        response = ScanResponse(
             decision=result["decision"],
             confidence=result["metadata"]["decision_reasoning"]["confidence"],
             reasoning=result["metadata"]["decision_reasoning"]["reasoning"],
@@ -231,6 +232,25 @@ def scan_prompt(
                 [],
             ),
         )
+
+        if result["decision"] == "block":
+            try:
+                from app.api.v1.webhooks import deliver_webhook
+                deliver_webhook(
+                    db=db,
+                    user_id=current_user.id,
+                    event="guard_block",
+                    payload={
+                        "decision": "block",
+                        "confidence": response.confidence,
+                        "matched_patterns": response.matched_patterns,
+                        "prompt_hash": hashlib.sha256(request.prompt.encode()).hexdigest(),
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Failed to trigger webhook payload: {str(e)}")
+
+        return response
 
     except Exception as e:
         logger.exception("Guard scan failed")
@@ -495,6 +515,11 @@ def get_guard_stats(
             )
 
     scans_per_day = list(daily_buckets.values())
+
+    # Ensure each daily bucket contains a total `count` field for
+    # compatibility with the response schema (date + count).
+    for b in scans_per_day:
+        b["count"] = int(b.get("allow", 0) or 0) + int(b.get("sanitize", 0) or 0) + int(b.get("block", 0) or 0)
 
     return {
         "window": window,
