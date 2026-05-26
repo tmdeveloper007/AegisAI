@@ -14,6 +14,7 @@ from collections import Counter, defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from threading import Lock
 from typing import Optional
+from app.api.v1.webhooks import deliver_webhook
 import logging
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
@@ -181,6 +182,7 @@ def scan_prompt(
     request: ScanRequest,
     background_tasks: BackgroundTasks,
     current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
     """
     Scan a prompt for injection risks.
@@ -221,7 +223,7 @@ def scan_prompt(
             result,
         )
 
-        return ScanResponse(
+        response = ScanResponse(
             decision=result["decision"],
             confidence=result["metadata"]["decision_reasoning"]["confidence"],
             reasoning=result["metadata"]["decision_reasoning"]["reasoning"],
@@ -232,12 +234,32 @@ def scan_prompt(
             ),
         )
 
-    except Exception as e:
+        if result["decision"] == "block":
+            try:
+                deliver_webhook(
+                    db=db,
+                    user_id=current_user.id,
+                    event="guard_block",
+                    payload={
+                        "decision": "block",
+                        "confidence": response.confidence,
+                        "matched_patterns": response.matched_patterns,
+                        "prompt_hash": hashlib.sha256(
+                            request.prompt.encode()
+                        ).hexdigest(),
+                    },
+                )
+            except Exception:
+                logger.exception("Failed to trigger guard_block webhook delivery")
+
+        return response
+
+    except Exception:
         logger.exception("Guard scan failed")
 
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An internal error occurred while processing the Guard scan."
+            detail="An internal error occurred while processing the Guard scan.",
         )
 
 
