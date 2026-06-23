@@ -17,6 +17,7 @@ from app.main import app
 from app.models.user import User
 from app.models.ai_system import AISystem
 from app.models.ai_system import ComplianceStatus
+from tests.csrf_client import _CSRFClientWrapper
 
 
 @pytest.fixture(scope="module")
@@ -84,8 +85,8 @@ def client(db):
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[get_current_user] = override_user
 
-    with TestClient(app) as c:
-        yield c
+    with TestClient(app) as tc:
+        yield _CSRFClientWrapper(tc)
 
     app.dependency_overrides.clear()
 

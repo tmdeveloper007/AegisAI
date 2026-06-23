@@ -14,6 +14,7 @@ from app.core.database import Base, get_db
 from app.core.security import get_current_user, get_password_hash, verify_password
 from app.main import app
 from app.models.user import User
+from tests.csrf_client import _CSRFClientWrapper
 
 
 @pytest.fixture(scope="module")
@@ -54,8 +55,8 @@ def client(db):
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[get_current_user] = override_user
 
-    with TestClient(app) as c:
-        yield c, user
+    with TestClient(app) as tc:
+        yield _CSRFClientWrapper(tc), user
 
     app.dependency_overrides.clear()
 

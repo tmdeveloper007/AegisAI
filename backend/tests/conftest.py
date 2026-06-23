@@ -1,7 +1,10 @@
 """Shared pytest fixtures for all tests."""
 
+from __future__ import annotations
+from tests.csrf_client import _CSRFClientWrapper
 import os
 import pytest
+from typing import Any
 from unittest.mock import MagicMock
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
@@ -115,12 +118,22 @@ def client(db_engine):
     connection.close()
     app.dependency_overrides.clear()
 
+
+
 @pytest.fixture
-def auth_headers(client):
+def csrf_client(client: _CSRFClientWrapper):
+    """CSRF-aware test client.  Handles X-CSRF-Token automatically for
+    state-changing requests (POST / PUT / PATCH / DELETE)."""
+    return client
+
+
+@pytest.fixture
+def auth_headers(csrf_client):
     email = f"batch-scan-{uuid4()}@example.com"
     password = "TestPass123!"
 
-    client.post(
+    # Register via csrf_client so the cookie is populated
+    csrf_client.post(
         "/api/v1/auth/register",
         json={
             "email": email,
@@ -129,31 +142,37 @@ def auth_headers(client):
         },
     )
 
-    response = client.post(
+    response = csrf_client.post(
         "/api/v1/auth/login",
         data={"username": email, "password": password},
     )
     token = response.json()["access_token"]
 
-    return {"Authorization": f"Bearer {token}"}
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-CSRF-Token": csrf_client._csrf_token,
+    }
 
 
 @pytest.fixture
-def other_user_auth_headers(client, db_session):
+def other_user_auth_headers(csrf_client, db_session):
     # Register a different user
-    client.post("/api/v1/auth/register", json={
+    csrf_client.post("/api/v1/auth/register", json={
         "email": "other@example.com",
         "password": "OtherPass123!",
         "full_name": "Other User",
         "company_name": "Other Corp",
     })
-    response = client.post(
+    response = csrf_client.post(
         "/api/v1/auth/login",
         data={"username": "other@example.com", "password": "OtherPass123!"},
         headers={"Content-Type": "application/x-www-form-urlencoded"}
     )
     token = response.json()["access_token"]
-    return {"Authorization": f"Bearer {token}"}
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-CSRF-Token": csrf_client._csrf_token,
+    }
 
 
 @pytest.fixture(autouse=True)

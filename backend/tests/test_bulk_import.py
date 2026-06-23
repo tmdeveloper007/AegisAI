@@ -46,8 +46,8 @@ def client(db):
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_user
 
-    with TestClient(app) as c:
-        yield c, db
+    with TestClient(app) as tc:
+        yield _CSRFClientWrapper(tc), db
 
     app.dependency_overrides.clear()
 
@@ -158,6 +158,7 @@ class TestBulkImport:
 
         # Add an existing system for duplicate test
         from app.models.ai_system import AISystem
+from tests.csrf_client import _CSRFClientWrapper
         user = db.query(User).filter(User.email == "import@test.com").first()
         db.add(AISystem(owner_id=user.id, name="Duplicate Test"))
         db.commit()
