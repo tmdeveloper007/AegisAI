@@ -15,6 +15,7 @@ Follows the pattern established in backend/tests/test_guard.py.
 import pytest
 from unittest.mock import MagicMock, patch
 from fastapi.testclient import TestClient
+from .csrf_helpers import _CSRFClientWrapper
  
  
 # ---------------------------------------------------------------------------
@@ -87,9 +88,8 @@ def _make_client():
     app.dependency_overrides[get_current_user] = lambda: mock_user
 
     client = TestClient(app)
-    # Pre-fetch CSRF token so subsequent POST requests succeed
-    client.get("/api/v1/auth/csrf-token")
-    return client
+    # Wrap in _CSRFClientWrapper so POST requests auto-inject CSRF tokens
+    return _CSRFClientWrapper(client)
  
  
 # ---------------------------------------------------------------------------
