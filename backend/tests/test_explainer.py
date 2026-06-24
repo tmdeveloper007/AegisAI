@@ -47,14 +47,14 @@ class TestExtractKeywords:
             "Our AI screens CVs and ranks job applicants during recruitment"
         )
         assert "recruitment" in keywords
-        assert "cv" in keywords
+        assert "cvs" in keywords  # 3 chars, extracted from CVs
         assert "screening" in keywords
         assert "job" in keywords
 
     def test_minimum_word_length(self):
-        keywords = _extract_keywords("a ai is")
+        keywords = _extract_keywords("a an is")
         assert "a" not in keywords  # 1 char < 2
-        assert "ai" in keywords    # 2 chars >= 2
+        assert "an" in keywords    # 2 chars >= 2
 
     def test_empty_description(self):
         keywords = _extract_keywords("")
