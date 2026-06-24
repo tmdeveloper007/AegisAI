@@ -224,7 +224,7 @@ def _normalize(text: str) -> str:
 
 
 def _extract_keywords(description: str) -> List[str]:
-    """Extract meaningful keywords from the description."""
+    """Extract meaningful keywords from the description, deduplicating while preserving order."""
     normalized = _normalize(description)
     # Remove common stop words, keep meaningful terms
     stop_words = {
@@ -237,7 +237,14 @@ def _extract_keywords(description: str) -> List[str]:
         "its", "it", "we", "they", "system", "ai", "model", "tool",
     }
     words = re.findall(r'\b[a-z]{3,}\b', normalized)
-    return [w for w in words if w not in stop_words]
+    # Deduplicate while preserving first-occurrence order
+    seen: set[str] = set()
+    unique: list[str] = []
+    for w in words:
+        if w not in stop_words and w not in seen:
+            seen.add(w)
+            unique.append(w)
+    return unique
 
 
 def _match_factors(
