@@ -21,49 +21,60 @@ import CopyButton from '../components/CopyButton'
 function renderMarkdown(text: string): React.ReactNode[] {
   const lines = text.split('\n')
   const elements: React.ReactNode[] = []
+  const listItems: React.ReactNode[] = []
   let inList = false
+
+  const flushList = () => {
+    if (listItems.length > 0) {
+      elements.push(<ul className="list-disc pl-5 space-y-1 my-2">{listItems}</ul>)
+      listItems.length = 0
+    }
+    inList = false
+  }
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]
 
     // Heading
     if (line.startsWith('### ')) {
-      if (inList) { elements.push(<ul key={`ul-${i}`} className="list-disc pl-5 space-y-1" /></ul>); inList = false }
-      elements.push(<h4 key={i} className="font-semibold text-gray-800 mt-3 mb-1">{line.slice(4)}</h4>)
+      flushList()
+      elements.push(<h4 key={`h4-${i}`} className="font-semibold text-gray-800 mt-3 mb-1">{line.slice(4)}</h4>)
       continue
     }
     if (line.startsWith('## ')) {
-      if (inList) { elements.push(<ul key={`ul-${i}`} className="list-disc pl-5 space-y-1" /></ul>); inList = false }
-      elements.push(<h3 key={i} className="font-bold text-gray-900 mt-4 mb-1">{line.slice(3)}</h3>)
+      flushList()
+      elements.push(<h3 key={`h3-${i}`} className="font-bold text-gray-900 mt-4 mb-1">{line.slice(3)}</h3>)
       continue
     }
     if (line.startsWith('# ')) {
-      if (inList) { elements.push(<ul key={`ul-${i}`} className="list-disc pl-5 space-y-1" /></ul>); inList = false }
-      elements.push(<h2 key={i} className="font-bold text-lg text-gray-900 mt-4 mb-2">{line.slice(2)}</h2>)
+      flushList()
+      elements.push(<h2 key={`h2-${i}`} className="font-bold text-lg text-gray-900 mt-4 mb-2">{line.slice(2)}</h2>)
       continue
     }
 
     // Unordered list
     if (line.match(/^[-*+] /)) {
-      if (!inList) { elements.push(<ul key={`ul-start-${i}`} className="list-disc pl-5 space-y-1 my-2">); inList = true }
-      elements.push(<li key={i} className="text-gray-700">{renderInline(line.slice(2))}</li>)
+      if (!inList) { inList = true }
+      listItems.push(<li key={`li-${i}`} className="text-gray-700">{renderInline(line.slice(2))}</li>)
       continue
     }
 
     // Close list on blank or non-list line
-    if (inList) { elements.push(<ul key={`ul-end-${i}`} className="list-disc pl-5 space-y-1" />); inList = false }
+    if (inList) {
+      flushList()
+      continue
+    }
 
     // Blank line
     if (line.trim() === '') {
-      elements.push(<br key={`br-${i}`} />)
       continue
     }
 
     // Paragraph
-    elements.push(<p key={i} className="text-gray-700 leading-relaxed">{renderInline(line)}</p>)
+    elements.push(<p key={`p-${i}`} className="text-gray-700 leading-relaxed">{renderInline(line)}</p>)
   }
 
-  if (inList) elements.push(<ul key="ul-final" className="list-disc pl-5 space-y-1" />)
+  if (inList) flushList()
   return elements
 }
 
@@ -73,32 +84,31 @@ function renderInline(text: string): React.ReactNode {
   let remaining = text
 
   while (remaining.length > 0) {
-    // Bold **text**
     const boldMatch = remaining.match(/\*\*(.+?)\*\*/)
-    // Italic *text*
     const italicMatch = remaining.match(/\*(.+?)\*/)
-    // Inline code `text`
     const codeMatch = remaining.match(/`(.+?)`/)
 
-    const matches = [
-      boldMatch ? { type: 'bold' as const, match: boldMatch, start: boldMatch.index } : null,
-      italicMatch ? { type: 'italic' as const, match: italicMatch, start: italicMatch.index } : null,
-      codeMatch ? { type: 'code' as const, match: codeMatch, start: codeMatch.index } : null,
-    ].filter(Boolean).sort((a, b) => (a!.start) - (b!.start))
+    type M = { type: 'bold' | 'italic' | 'code', match: RegExpMatchArray, start: number }
+    const raw: (M | null)[] = [
+      boldMatch ? { type: 'bold', match: boldMatch, start: boldMatch.index! } : null,
+      italicMatch ? { type: 'italic', match: italicMatch, start: italicMatch.index! } : null,
+      codeMatch ? { type: 'code', match: codeMatch, start: codeMatch.index! } : null,
+    ]
+    const matches = (raw.filter((x): x is M => x !== null) as M[]).sort((a, b) => a.start - b.start)
 
-    if (matches.length === 0 || matches[0]!.start !== 0) {
-      const next = matches.length > 0 ? matches[0]!.start : remaining.length
+    if (matches.length === 0 || matches[0].start !== 0) {
+      const next = matches.length > 0 ? matches[0].start : remaining.length
       parts.push(remaining.slice(0, next))
       remaining = remaining.slice(next)
       continue
     }
 
-    const m = matches[0]!
+    const m = matches[0]
     parts.push(remaining.slice(0, m.start))
     const content = m.match[1]
-    if (m.type === 'bold') parts.push(<strong key={parts.length} className="font-semibold">{content}</strong>)
-    else if (m.type === 'italic') parts.push(<em key={parts.length}>{content}</em>)
-    else if (m.type === 'code') parts.push(<code key={parts.length} className="bg-gray-100 text-pink-600 px-1 py-0.5 rounded text-sm font-mono">{content}</code>)
+    if (m.type === 'bold') parts.push(<strong key={`bold-${parts.length}`} className="font-semibold">{content}</strong>)
+    else if (m.type === 'italic') parts.push(<em key={`em-${parts.length}`}>{content}</em>)
+    else if (m.type === 'code') parts.push(<code key={`code-${parts.length}`} className="bg-gray-100 text-pink-600 px-1 py-0.5 rounded text-sm font-mono">{content}</code>)
     remaining = remaining.slice(m.match[0].length)
   }
 
