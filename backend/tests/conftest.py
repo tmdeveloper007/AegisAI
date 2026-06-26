@@ -8,6 +8,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 from fastapi import Request, HTTPException, status
 from fastapi.testclient import TestClient
+from starlette.responses import Response
 
 # Set test database before importing app
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
@@ -107,8 +108,9 @@ def client(db_engine):
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_current_user
 
-    client = TestClient(app)
-    yield client
+    test_client = TestClient(app)
+    csrf_client = _CSRFClientWrapper(test_client)
+    yield csrf_client
 
     session.close()
     transaction.rollback()
@@ -137,30 +139,30 @@ class _CSRFClientWrapper:
         headers["X-CSRF-Token"] = self._csrf_token
         kwargs["headers"] = headers
 
-    def get(self, url: str, **kwargs: object) -> TestClient.response:
+    def get(self, url: str, **kwargs: object) -> Response:
         return self._inner.get(url, **kwargs)
 
-    def post(self, url: str, **kwargs: object) -> TestClient.response:
+    def post(self, url: str, **kwargs: object) -> Response:
         self._ensure_csrf()
         self._inject_csrf(kwargs)
         return self._inner.post(url, **kwargs)
 
-    def put(self, url: str, **kwargs: object) -> TestClient.response:
+    def put(self, url: str, **kwargs: object) -> Response:
         self._ensure_csrf()
         self._inject_csrf(kwargs)
         return self._inner.put(url, **kwargs)
 
-    def patch(self, url: str, **kwargs: object) -> TestClient.response:
+    def patch(self, url: str, **kwargs: object) -> Response:
         self._ensure_csrf()
         self._inject_csrf(kwargs)
         return self._inner.patch(url, **kwargs)
 
-    def delete(self, url: str, **kwargs: object) -> TestClient.response:
+    def delete(self, url: str, **kwargs: object) -> Response:
         self._ensure_csrf()
         self._inject_csrf(kwargs)
         return self._inner.delete(url, **kwargs)
 
-    def request(self, method: str, url: str, **kwargs: object) -> TestClient.response:
+    def request(self, method: str, url: str, **kwargs: object) -> Response:
         if method.upper() in ("POST", "PUT", "PATCH", "DELETE"):
             self._ensure_csrf()
             self._inject_csrf(kwargs)
@@ -174,7 +176,8 @@ class _CSRFClientWrapper:
 def csrf_client(client: TestClient):
     """CSRF-aware test client.  Handles X-CSRF-Token automatically for
     state-changing requests (POST / PUT / PATCH / DELETE)."""
-    return _CSRFClientWrapper(client)
+    # client fixture already returns a CSRF-aware wrapper.
+    return client
 
 
 @pytest.fixture
