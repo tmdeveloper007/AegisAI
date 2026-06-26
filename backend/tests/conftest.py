@@ -168,6 +168,12 @@ class _CSRFClientWrapper:
             self._inject_csrf(kwargs)
         return self._inner.request(method, url, **kwargs)
 
+    def stream(self, method: str, url: str, **kwargs):
+        if method.upper() in ("POST", "PUT", "PATCH", "DELETE"):
+            self._ensure_csrf()
+            self._inject_csrf(kwargs)
+        return self._inner.stream(method, url, **kwargs)
+
     def __getattr__(self, name: str) -> object:
         return getattr(self._inner, name)
 
@@ -181,12 +187,12 @@ def csrf_client(client: TestClient):
 
 
 @pytest.fixture
-def auth_headers(csrf_client):
+def auth_headers(client):
     email = f"batch-scan-{uuid4()}@example.com"
     password = "TestPass123!"
 
-    # Register via csrf_client so the cookie is populated
-    csrf_client.post(
+    # Register via client so the cookie is populated
+    client.post(
         "/api/v1/auth/register",
         json={
             "email": email,
@@ -195,7 +201,7 @@ def auth_headers(csrf_client):
         },
     )
 
-    response = csrf_client.post(
+    response = client.post(
         "/api/v1/auth/login",
         data={"username": email, "password": password},
     )
@@ -203,20 +209,20 @@ def auth_headers(csrf_client):
 
     return {
         "Authorization": f"Bearer {token}",
-        "X-CSRF-Token": csrf_client._csrf_token,
+        "X-CSRF-Token": client._csrf_token,
     }
 
 
 @pytest.fixture
-def other_user_auth_headers(csrf_client, db_session):
+def other_user_auth_headers(client, db_session):
     # Register a different user
-    csrf_client.post("/api/v1/auth/register", json={
+    client.post("/api/v1/auth/register", json={
         "email": "other@example.com",
         "password": "OtherPass123!",
         "full_name": "Other User",
         "company_name": "Other Corp",
     })
-    response = csrf_client.post(
+    response = client.post(
         "/api/v1/auth/login",
         data={"username": "other@example.com", "password": "OtherPass123!"},
         headers={"Content-Type": "application/x-www-form-urlencoded"}
@@ -224,7 +230,7 @@ def other_user_auth_headers(csrf_client, db_session):
     token = response.json()["access_token"]
     return {
         "Authorization": f"Bearer {token}",
-        "X-CSRF-Token": csrf_client._csrf_token,
+        "X-CSRF-Token": client._csrf_token,
     }
 
 
