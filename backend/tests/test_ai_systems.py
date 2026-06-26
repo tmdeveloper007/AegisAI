@@ -3,7 +3,6 @@ import pytest
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.pool import StaticPool
 from sqlalchemy.orm import sessionmaker
@@ -14,6 +13,8 @@ from app.main import app
 from app.models.user import User
 from uuid import uuid4
 from app.models.ai_system import AISystem
+from fastapi.testclient import TestClient
+from tests.conftest import _CSRFClientWrapper
 
 
 @pytest.fixture(scope="module")
@@ -37,7 +38,6 @@ def db(engine):
 
 @pytest.fixture
 def client(db):
-    from tests.conftest import _CSRFClientWrapper
     user = User(email="dup@test.com", hashed_password="x", full_name="Dupe")
     db.add(user)
     db.flush()
@@ -51,8 +51,8 @@ def client(db):
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_user
 
-    with TestClient(app) as c:
-        yield _CSRFClientWrapper(c)
+    inner_client = _CSRFClientWrapper(TestClient(app))
+    yield inner_client
 
     app.dependency_overrides.clear()
 

@@ -109,8 +109,7 @@ def client(db_engine):
     app.dependency_overrides[get_current_user] = override_current_user
 
     test_client = TestClient(app)
-    csrf_client = _CSRFClientWrapper(test_client)
-    yield csrf_client
+    yield _CSRFClientWrapper(test_client)
 
     session.close()
     transaction.rollback()

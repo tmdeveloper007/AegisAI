@@ -3,6 +3,7 @@ Tests for PATCH /api/v1/ai-systems/{id}/status endpoint.
 """
 import pytest
 from fastapi.testclient import TestClient
+from tests.conftest import _CSRFClientWrapper
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -36,7 +37,6 @@ def db(engine):
 
 @pytest.fixture
 def client(db):
-    from tests.conftest import _CSRFClientWrapper
     user = User(email="patch@test.com", hashed_password="x", full_name="Patcher")
     db.add(user)
     db.flush()
@@ -58,8 +58,8 @@ def client(db):
     app.dependency_overrides[get_db] = override_db
     app.dependency_overrides[get_current_user] = override_user
 
-    with TestClient(app) as c:
-        yield _CSRFClientWrapper(c), system
+    inner_client = _CSRFClientWrapper(TestClient(app))
+    yield inner_client, system
 
     app.dependency_overrides.clear()
 
@@ -121,7 +121,7 @@ class TestPatchStatus:
         )
         assert resp.status_code == 422
 
-    def test_patch_other_users_system_returns_404(self, db):
+    def test_patch_other_users_system_returns_404(self, client, db):
         # Create owner user
         owner = User(
             email="owner@test.com",
@@ -154,13 +154,12 @@ class TestPatchStatus:
         app.dependency_overrides[get_db] = override_db
         app.dependency_overrides[get_current_user] = override_user
 
-        from tests.conftest import _CSRFClientWrapper
-        with TestClient(app) as c:
-            resp = _CSRFClientWrapper(c).patch(
-                f"/api/v1/ai-systems/{system.id}/status",
-                json={"compliance_status": "compliant"},
-            )
+        c = _CSRFClientWrapper(TestClient(app))
+        resp = c.patch(
+            f"/api/v1/ai-systems/{system.id}/status",
+            json={"compliance_status": "compliant"},
+        )
 
-            assert resp.status_code == 404
+        assert resp.status_code == 404
 
         app.dependency_overrides.clear()

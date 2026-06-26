@@ -48,7 +48,8 @@ def client(db):
     app.dependency_overrides[get_current_user] = override_user
 
     with TestClient(app) as c:
-        yield _CSRFClientWrapper(c), db
+        inner_client = _CSRFClientWrapper(TestClient(app))
+    yield inner_client, db
 
     app.dependency_overrides.clear()
 
