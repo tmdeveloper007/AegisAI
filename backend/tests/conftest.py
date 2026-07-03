@@ -9,6 +9,7 @@ from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
 from fastapi import Request, HTTPException, status
 from fastapi.testclient import TestClient
+from starlette.responses import Response
 
 # Set test database before importing app
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
@@ -109,7 +110,7 @@ def client(db_engine):
     app.dependency_overrides[get_current_user] = override_current_user
 
     client = _CSRFClientWrapper(TestClient(app))
-    yield client
+    yield _CSRFClientWrapper(plain_client)
 
 
 @pytest.fixture
