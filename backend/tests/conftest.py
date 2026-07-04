@@ -16,6 +16,14 @@ os.environ["SECRET_KEY"] = "testsecret"
 os.environ["REDIS_URL"] = ""
 
 from app.core.database import Base
+
+@pytest.fixture(autouse=True)
+def bypass_csrf_for_tests(monkeypatch, request):
+    """Keep endpoint tests focused on application behavior, not CSRF transport."""
+    if request.node.path.name == "test_csrf.py":
+        return
+    monkeypatch.setattr("app.middleware.csrf._is_csrf_exempt", lambda _path: True)
+
 from app.core.security import decode_token, get_current_user
 from app.models.user import SubscriptionTier
 from app.models.user import User
