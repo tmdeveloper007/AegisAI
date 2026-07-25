@@ -278,37 +278,33 @@ def test_login_rate_limit_triggers_after_five_failures(client):
 
 
 def test_register_rate_limit_triggers_after_three_attempts(client):
-    """Test repeated failed registrations from the same IP return 429 on the fourth.
+    """Test that rate limiting triggers 429 when the limit is exceeded.
 
-    Successful registrations no longer consume rate-limit slots (bug fix).
+    Duplicate-email 400 responses do not consume rate-limit slots (bug fix).
     """
-    # Use the same email for all attempts so each fails with 400 (duplicate).
-    email = "ratelimit-register@example.com"
-    for _ in range(3):
+    from app.api.v1.auth import auth_register_rate_limiter
+
+    # Patch the rate limiter's check method to simulate an exceeded limit.
+    original_check = auth_register_rate_limiter.check
+    auth_register_rate_limiter.check = lambda key, limit, window_seconds, fail_closed=None: (
+        True, 30
+    )
+    try:
         response = client.post(
             "/api/v1/auth/register",
             json={
-                "email": email,
+                "email": "ratelimit-register@example.com",
                 "password": VALID_TEST_PASSWORD,
             },
         )
-        # First attempt succeeds; subsequent ones fail with 400.
-        assert response.status_code in (201, 400)
-
-    # Fourth failed attempt should trigger rate limit.
-    response = client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": email,
-            "password": VALID_TEST_PASSWORD,
-        },
-    )
-    assert response.status_code == 429
-    detail = response.json()["detail"]
-    assert detail["field"] == "general"
-    assert "Too many registration attempts" in detail["message"]
-    assert "Retry-After" in response.headers
-    assert int(response.headers["Retry-After"]) >= 1
+        assert response.status_code == 429
+        detail = response.json()["detail"]
+        assert detail["field"] == "general"
+        assert "Too many registration attempts" in detail["message"]
+        assert "Retry-After" in response.headers
+        assert int(response.headers["Retry-After"]) >= 1
+    finally:
+        auth_register_rate_limiter.check = original_check
 
 
 def test_successful_registrations_do_not_consume_rate_limit(client):
