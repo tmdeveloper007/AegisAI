@@ -6,6 +6,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [Unreleased]
 
 ### Added
+- **Analytics CSV Export** — Added streaming CSV export endpoint (`GET /analytics/audit-logs/export`) for guard scan audit logs, using FastAPI StreamingResponse to avoid memory pressure on large datasets.
 - **Compliance Scheduler** — Implemented background APScheduler jobs (`snapshot_compliance_scores`, `send_reassessment_reminders`) for daily compliance snapshots and risk-assessment expiry notifications.
 - **Pre-commit hooks** — Added `.pre-commit-config.yaml` with repository hygiene hooks (trailing-whitespace, end-of-file-fixer, check-merge-conflict, check-yaml, check-json) and a local ESLint hook wrapping the existing frontend lint command.
 - **LLM Guard Prompt Normalization** — Preprocessor layer (`normalizer.py`) to prevent Unicode, zero-width, and homoglyph bypasses:
@@ -16,6 +17,8 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Unit and integration tests for bypass payloads (`test_normalizer.py` and `test_guard.py`)
 
 ### Fixed
+- **Auth Rate Limit (#1585)** — Registration rate-limit now records attempts only for non-400 failures; duplicate-email 400 responses no longer consume rate-limit slots, preventing legitimate new users from being prematurely rate-limited.
+- **Guard Export Authorization (#1587)** — Added admin-only authorization to `GET /guard/logs/export`; non-admin users attempting to export another user's logs now receive 403 Forbidden.
 - **Analytics Dashboard (#921)** — Replaced hardcoded mock data with live API calls (`/analytics/summary`, `/analytics/compliance-timeline`, `/analytics/system-risk`). Added loading skeletons, error states with retry buttons, system selector dropdown, and dynamic dark/light chart theming.
 - **RAG Plaintext Privacy (#1034)** — Replaced plaintext question/answer storage with SHA-256 hashes in `RagQuery` and `RAGFeedback` models; history endpoint returns hashes and lengths instead of raw text, preventing accidental plaintext exposure in the database and API responses.
 - **Webhook Delivery (#1033)** — Changed webhook delivery from `BackgroundTasks` to direct synchronous `_post_webhook` call with retry logic, ensuring immediate delivery during request lifecycle.
