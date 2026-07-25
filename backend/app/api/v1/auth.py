@@ -128,13 +128,25 @@ def register(
         db.commit()
         db.refresh(user)
         return user
-    except HTTPException:
-        # Record the failed registration attempt so repeated abuse is rate-limited
-        auth_register_rate_limiter.record_attempt(
-            key=f"auth:register:{client_ip}",
-            limit=_AUTH_REGISTER_RATE_LIMIT_REQUESTS,
-            window_seconds=_AUTH_REGISTER_RATE_LIMIT_WINDOW_SECONDS,
+    except ValueError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "field": "password",
+                "message": "Password does not meet strength requirements."
+            }
         )
+    except HTTPException as exc:
+        # Record the failed registration attempt only for non-400 errors.
+        # Duplicate-email (400) is not an abuse attempt and should not
+        # count toward the rate-limit counter.
+        if exc.status_code != status.HTTP_400_BAD_REQUEST:
+            auth_register_rate_limiter.record_attempt(
+                key=f"auth:register:{client_ip}",
+                limit=_AUTH_REGISTER_RATE_LIMIT_REQUESTS,
+                window_seconds=_AUTH_REGISTER_RATE_LIMIT_WINDOW_SECONDS,
+            )
         raise
     except Exception:
         db.rollback()
