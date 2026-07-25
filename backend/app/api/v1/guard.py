@@ -659,6 +659,7 @@ def export_guard_scan_logs(
     start_date: Optional[datetime] = Query(None),
     end_date: Optional[datetime] = Query(None),
     limit: int = Query(10000, ge=1, le=50000, description="Max records to export"),
+    user_id: Optional[int] = Query(None, description="Filter by user ID (admin only)"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -671,9 +672,17 @@ def export_guard_scan_logs(
     if start_date and end_date and start_date > end_date:
         raise HTTPException(status_code=400, detail="start_date cannot be after end_date")
 
+    is_admin = getattr(current_user, "role", None) == "admin"
+    if user_id is not None and user_id != current_user.id and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to export audit logs for another user.",
+        )
+
+    target_user_id = user_id if user_id is not None else current_user.id
 
     export_filters = build_history_filters(
-        current_user.id,
+        target_user_id,
         decision,
         intent,
         start_date,
