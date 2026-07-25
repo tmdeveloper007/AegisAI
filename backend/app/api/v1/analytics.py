@@ -12,6 +12,7 @@ TODO for contributors (help wanted):
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -206,3 +207,76 @@ def get_audit_logs(
     logs = base_query.order_by(GuardScanLog.scanned_at.desc()).offset(skip).limit(limit).all()
 
     return PaginatedResponse(items=logs, total=total, skip=skip, limit=limit)
+
+
+@router.get("/audit-logs/export")
+def export_audit_logs(
+    user_id: Optional[int] = Query(None, description="Filter by user ID"),
+    decision: Optional[str] = Query(None, pattern="^(allow|sanitize|block)$", description="Filter by decision"),
+    days: Optional[int] = Query(None, ge=1, description="Only include logs from the last N days"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Export guard scan audit logs as a streamed CSV file.
+
+    Administrators can download scan history for compliance reporting without
+    hitting the browser memory limit on large datasets.
+    """
+    is_admin = getattr(current_user, "role", None) == "admin"
+    if user_id is not None and user_id != current_user.id and not is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to export audit logs for another user.",
+        )
+
+    target_user_id = user_id if user_id is not None else current_user.id
+    filters = [GuardScanLog.user_id == target_user_id]
+
+    if decision:
+        filters.append(GuardScanLog.decision == decision)
+    if days:
+        since = datetime.now(timezone.utc) - timedelta(days=days)
+        filters.append(GuardScanLog.scanned_at >= since)
+
+    query = db.query(GuardScanLog).filter(*filters).order_by(
+        GuardScanLog.scanned_at.desc()
+    ).limit(50000)
+
+    def csv_rows():
+        import csv
+        import io
+        output = io.StringIO()
+        writer = csv.DictWriter(
+            output,
+            fieldnames=[
+                "id", "user_id", "decision", "confidence",
+                "detection_type", "prompt_length", "scanned_at",
+            ],
+        )
+        writer.writeheader()
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate()
+
+        for log in query.yield_per(500):
+            writer.writerow({
+                "id": log.id,
+                "user_id": log.user_id,
+                "decision": log.decision,
+                "confidence": round(log.confidence, 4),
+                "detection_type": log.detection_type or "",
+                "prompt_length": log.prompt_length or 0,
+                "scanned_at": log.scanned_at.isoformat() if log.scanned_at else "",
+            })
+            yield output.getvalue()
+            output.seek(0)
+            output.truncate()
+
+    return StreamingResponse(
+        csv_rows(),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": "attachment; filename=audit_logs.csv",
+        },
+    )
