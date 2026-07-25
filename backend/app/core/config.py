@@ -111,6 +111,10 @@ class Settings(BaseSettings):
             "password",
             "test",
         }
+        if not v or not v.strip():
+            raise ValueError(
+                "SECRET_KEY is not set. Generate one with: openssl rand -hex 32"
+            )
         if v.strip().lower() in known_weak_secrets:
             raise ValueError(
                 "SECRET_KEY is set to a well-known insecure default value. "
