@@ -611,8 +611,18 @@ def query_knowledge_base(
                 "warning": cached_answer.warning,
             }
         else:
-            qa_chain = get_qa_chain(user_id=current_user.id)
-            result = qa_chain({"query": guarded_question.question})
+            try:
+                qa_chain = get_qa_chain(user_id=current_user.id)
+                result = qa_chain({"query": guarded_question.question})
+            except Exception as exc:
+                logger.error("RAG LLM call failed: %s", exc, exc_info=True)
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail={
+                        "error": "ai_service_unavailable",
+                        "safe_message": "The AI service is temporarily unavailable. Please try again later.",
+                    },
+                )
         latency_ms = (time.monotonic() - t_start) * 1000
 
         source_docs = result.get("source_documents", [])
