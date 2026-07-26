@@ -157,13 +157,15 @@ def get_system_risk(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Return per-system risk scores for the current user."""
+    """Return per-system risk scores for the current user (max 1000 results)."""
+    LIMIT = 1000
     systems = (
         db.query(AISystem.id, AISystem.name, AISystem.compliance_score, AISystem.risk_level)
         .filter(AISystem.owner_id == current_user.id)
+        .limit(LIMIT)
         .all()
     )
-    return [
+    result = [
         {
             "id": system.id,
             "name": system.name,
@@ -172,6 +174,9 @@ def get_system_risk(
         }
         for system in systems
     ]
+    if len(systems) == LIMIT:
+        result.append({"__truncated__": True})
+    return result
 
 
 @router.get("/audit-logs", response_model=PaginatedResponse[GuardAuditLogResponse])
