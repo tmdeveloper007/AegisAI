@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Optional
 from urllib.parse import urlparse
 import ipaddress
+import socket
 
 from pydantic import BaseModel, Field, HttpUrl, field_validator
 
@@ -67,6 +68,33 @@ class WebhookCreate(BaseModel):
         # This is a basic check - in production, you'd want DNS resolution checks
         if hostname.endswith(".internal") or hostname.endswith(".local"):
             raise ValueError("Internal domain names are not allowed")
+
+        # DNS rebinding protection: resolve the hostname and verify the
+        # resolved IP is not a private / loopback / metadata endpoint.
+        try:
+            resolved_ip_str = socket.gethostbyname(hostname)
+            resolved_ip = ipaddress.ip_address(resolved_ip_str)
+            if resolved_ip.is_private:
+                raise ValueError(
+                    f"Hostname '{hostname}' resolves to a private IP ({resolved_ip_str})"
+                )
+            if resolved_ip.is_loopback:
+                raise ValueError(
+                    f"Hostname '{hostname}' resolves to a loopback IP ({resolved_ip_str})"
+                )
+            if resolved_ip.is_link_local:
+                raise ValueError(
+                    f"Hostname '{hostname}' resolves to a link-local IP ({resolved_ip_str})"
+                )
+            if str(resolved_ip) == "169.254.169.254":
+                raise ValueError(
+                    f"Hostname '{hostname}' resolves to the cloud metadata endpoint ({resolved_ip_str})"
+                )
+        except socket.gaierror:
+            # If DNS resolution fails we cannot verify safety - reject the URL.
+            raise ValueError(
+                f"Hostname '{hostname}' could not be resolved; please use a valid domain"
+            )
 
         return v
 
