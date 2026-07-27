@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 from app.modules.compliance.nist_mapping import EU_TO_NIST_MAPPING
 from app.schemas.ai_system import NISTMapping
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -157,7 +157,7 @@ class BulkClassificationItem(BaseModel):
 
 
 class BulkClassificationRequest(BaseModel):
-    system_ids: List[int]
+    system_ids: List[int] = Field(..., max_length=100, description="Maximum 100 system IDs per request")
 
 
 class BulkClassificationResponse(BaseModel):
