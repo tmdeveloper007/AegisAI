@@ -130,12 +130,9 @@ def register(
         return user
     except HTTPException:
         # Record the failed registration attempt so repeated abuse is rate-limited
-        # record_attempt uses >= in rate_limit.py, so pass limit-1 so the
-        # check() call fires first (blocking on the Nth failed attempt when
-        # _AUTH_REGISTER_RATE_LIMIT_REQUESTS=N) rather than record_attempt.
         limited, retry_after = auth_register_rate_limiter.record_attempt(
             key=f"auth:register:{client_ip}",
-            limit=_AUTH_REGISTER_RATE_LIMIT_REQUESTS - 1,
+            limit=_AUTH_REGISTER_RATE_LIMIT_REQUESTS,
             window_seconds=_AUTH_REGISTER_RATE_LIMIT_WINDOW_SECONDS,
         )
         if limited:
@@ -153,7 +150,7 @@ def register(
         # Record the failed registration attempt so repeated abuse is rate-limited
         limited, retry_after = auth_register_rate_limiter.record_attempt(
             key=f"auth:register:{client_ip}",
-            limit=_AUTH_REGISTER_RATE_LIMIT_REQUESTS - 1,
+            limit=_AUTH_REGISTER_RATE_LIMIT_REQUESTS,
             window_seconds=_AUTH_REGISTER_RATE_LIMIT_WINDOW_SECONDS,
         )
         if limited:

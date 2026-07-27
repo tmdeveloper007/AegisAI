@@ -123,7 +123,7 @@ return {current, ttl}
             args=[cost, window_seconds],
         )
 
-        if int(current) >= limit:
+        if int(current) > limit:
             retry_after = int(ttl) if int(ttl) > 0 else window_seconds
             return True, retry_after
 
@@ -149,7 +149,7 @@ return {current, ttl}
             while attempts and attempts[0] <= window_start:
                 attempts.popleft()
 
-            if len(attempts) + cost >= limit:
+            if len(attempts) + cost > limit:
                 retry_after = (
                     max(
                         1,
