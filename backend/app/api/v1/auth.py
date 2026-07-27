@@ -130,20 +130,38 @@ def register(
         return user
     except HTTPException:
         # Record the failed registration attempt so repeated abuse is rate-limited
-        auth_register_rate_limiter.record_attempt(
+        limited, retry_after = auth_register_rate_limiter.record_attempt(
             key=f"auth:register:{client_ip}",
             limit=_AUTH_REGISTER_RATE_LIMIT_REQUESTS,
             window_seconds=_AUTH_REGISTER_RATE_LIMIT_WINDOW_SECONDS,
         )
+        if limited:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "field": "general",
+                    "message": "Too many registration attempts from this IP. Please try again later.",
+                },
+                headers={"Retry-After": str(retry_after)},
+            )
         raise
     except Exception:
         db.rollback()
         # Record the failed registration attempt so repeated abuse is rate-limited
-        auth_register_rate_limiter.record_attempt(
+        limited, retry_after = auth_register_rate_limiter.record_attempt(
             key=f"auth:register:{client_ip}",
             limit=_AUTH_REGISTER_RATE_LIMIT_REQUESTS,
             window_seconds=_AUTH_REGISTER_RATE_LIMIT_WINDOW_SECONDS,
         )
+        if limited:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "field": "general",
+                    "message": "Too many registration attempts from this IP. Please try again later.",
+                },
+                headers={"Retry-After": str(retry_after)},
+            )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={
