@@ -23,7 +23,7 @@ def snapshot_compliance_scores():
     """Daily snapshot of compliance scores for historical trend analysis."""
     db: Session = SessionLocal()
     try:
-        systems = db.query(AISystem).all()
+        systems = db.query(AISystem).limit(10000).all()
         for system in systems:
             if system.compliance_score is None:
                 continue
