@@ -17,7 +17,49 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
 os.environ.setdefault("SECRET_KEY", "test-secret-key")
 os.environ.setdefault("REDIS_URL", "")
 
+import pytest
+
 from app.modules.rag import streaming
+
+
+class TestAiterSync:
+    """Unit tests for _aiter_sync — async bridge for sync iterators."""
+
+    @pytest.mark.asyncio
+    async def test_yields_all_items_from_sync_iterator(self):
+        """_aiter_sync should yield every item the sync iterator produces."""
+        sync_iter = iter(["hello", " ", "world"])
+
+        results = [chunk async for chunk in streaming._aiter_sync(sync_iter)]
+        assert results == ["hello", " ", "world"]
+
+    @pytest.mark.asyncio
+    async def test_empty_iterator_yields_nothing(self):
+        """An empty sync iterator should yield no items."""
+        sync_iter = iter([])
+
+        results = [chunk async for chunk in streaming._aiter_sync(sync_iter)]
+        assert results == []
+
+    @pytest.mark.asyncio
+    async def test_single_item_iterator(self):
+        """A single-item iterator yields exactly that item."""
+        sync_iter = iter(["only"])
+
+        results = [chunk async for chunk in streaming._aiter_sync(sync_iter)]
+        assert results == ["only"]
+
+    @pytest.mark.asyncio
+    async def test_terminates_on_stop_iteration(self):
+        """After StopIteration the async generator should exit cleanly."""
+        sync_iter = iter(["a", "b", "c"])
+
+        collected = []
+        async for item in streaming._aiter_sync(sync_iter):
+            collected.append(item)
+
+        assert collected == ["a", "b", "c"]
+        # Iteration should terminate without raising
 
 
 @dataclass
