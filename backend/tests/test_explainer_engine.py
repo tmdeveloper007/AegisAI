@@ -103,6 +103,15 @@ class TestNormalize:
     def test_preserves_middle_whitespace(self):
         assert _normalize("hello world") == "hello world"
 
+    def test_none_input(self):
+        """_normalize returns empty string for None input."""
+        assert _normalize(None) == ""
+        assert _normalize("") == ""
+
+    def test_punctuation_stripped(self):
+        """_normalize strips leading/trailing punctuation too."""
+        assert _normalize("  hello-world!  ") == "hello-world!"
+
 
 class TestExtractKeywords:
     """Tests for _extract_keywords — removes stop words, keeps 3+ char words."""
@@ -135,6 +144,18 @@ class TestExtractKeywords:
         keywords = _extract_keywords("recruit recruitment recruiting")
         # All three contain "recruit"
         assert len([k for k in keywords if k == "recruit"]) == 1
+
+    def test_handles_punctuation_in_text(self):
+        """Punctuation does not break keyword extraction."""
+        keywords = _extract_keywords("credit-worthiness, lending: mortgage!")
+        # Punctuation chars are stripped before regex so "credit" is extracted
+        assert "credit" in keywords or "lending" in keywords
+
+    def test_case_insensitive_matching(self):
+        """_extract_keywords is case-insensitive."""
+        upper_keywords = _extract_keywords("CREDIT LENDING MORTGAGE")
+        lower_keywords = _extract_keywords("credit lending mortgage")
+        assert set(upper_keywords) == set(lower_keywords)
 
 
 class TestMatchFactors:

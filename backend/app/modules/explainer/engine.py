@@ -220,6 +220,8 @@ RECOMMENDATIONS: dict[RiskLevel, List[str]] = {
 
 def _normalize(text: str) -> str:
     """Lowercase and normalize text for keyword matching."""
+    if text is None:
+        return ""
     return text.lower().strip()
 
 
