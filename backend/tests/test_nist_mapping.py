@@ -112,6 +112,7 @@ class TestMappingDataQuality:
 
     @pytest.mark.parametrize("risk_tier", ["MINIMAL", "LIMITED", "HIGH", "UNACCEPTABLE"])
     def test_subcategories_have_em_dash_format(self, risk_tier):
+        """Subcategories should use the em-dash (U+2014) separator between code and description."""
         for sub in EU_TO_NIST_MAPPING[risk_tier]["subcategories"]:
-            assert " - " in sub, \
-                f"Subcategory '{sub}' should contain ' - ' separator"
+            assert " — " in sub, \
+                f"Subcategory '{sub}' should contain em-dash separator"
