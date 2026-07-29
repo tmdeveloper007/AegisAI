@@ -59,7 +59,7 @@ def get_compliance_timeline(
     snapshots = db.query(ComplianceSnapshot).filter(
         ComplianceSnapshot.ai_system_id == system_id,
         ComplianceSnapshot.snapshotted_at >= since
-    ).order_by(ComplianceSnapshot.snapshotted_at.asc()).all()
+    ).order_by(ComplianceSnapshot.snapshotted_at.asc()).limit(365).all()
 
     return ComplianceTimelineResponse(
         ai_system_id=system.id,
