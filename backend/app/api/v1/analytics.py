@@ -22,7 +22,6 @@ from app.models.user import User
 from app.schemas.analytics import ComplianceTimelineResponse
 from app.models.compliance_snapshot import ComplianceSnapshot
 from app.models.document import Document
-from sqlalchemy import func
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
