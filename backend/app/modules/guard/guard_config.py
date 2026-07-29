@@ -28,7 +28,11 @@ CLASSIFIER_MODEL_PATH = os.getenv(
 TOKENIZER_PATH = CLASSIFIER_MODEL_PATH  # Tokenizer stored in same directory as model
 
 # Security settings
-MAX_PROMPT_LENGTH = int(os.getenv("MAX_PROMPT_LENGTH", 2000))
+_max_prompt_env = os.getenv("MAX_PROMPT_LENGTH", "2000")
+try:
+    MAX_PROMPT_LENGTH = int(_max_prompt_env)
+except ValueError:
+    MAX_PROMPT_LENGTH = 2000
 SANITIZATION_LEVEL = os.getenv("SANITIZATION_LEVEL", "medium")  # low, medium, high
 
 # Classification thresholds
