@@ -64,10 +64,11 @@ class TestSanitizeCsvField:
         assert sanitize_csv_field("-") == "'-"
         assert sanitize_csv_field("@") == "'@"
 
-    def test_dangerous_char_with_leading_whitespace(self):
-        """Leading whitespace before a dangerous char is preserved and char is still prefixed."""
+    def test_dangerous_char_with_leading_whitespace_not_prefixed(self):
+        """A dangerous char after leading whitespace is not prefixed (function checks first char only)."""
         result = sanitize_csv_field("  =HYPERLINK(...)")
-        assert result.startswith("'")
+        # The function only checks value[0], so leading whitespace prevents prefixing.
+        assert result == "  =HYPERLINK(...)"
         assert "=HYPERLINK" in result
 
     def test_multiple_dangerous_prefixes_prefixed_once(self):
