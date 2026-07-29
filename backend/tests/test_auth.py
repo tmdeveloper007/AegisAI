@@ -280,27 +280,29 @@ def test_login_rate_limit_triggers_after_five_failures(client):
 def test_register_rate_limit_triggers_after_three_attempts(client):
     """Test repeated failed registrations from the same IP return 429 on the fourth.
 
-    Successful registrations no longer consume rate-limit slots (bug fix).
+    Non-400 HTTPExceptions (validation errors on 400 status codes excluded)
+    are recorded as failed attempts. This test uses Pydantic validation
+    failures (422) which are HTTPExceptions that DO count toward the limit.
     """
-    # Use the same email for all attempts so each fails with 400 (duplicate).
+    # Use the same email for all attempts so each fails with 422 (Pydantic validation).
     email = "ratelimit-register@example.com"
     for _ in range(3):
         response = client.post(
             "/api/v1/auth/register",
             json={
                 "email": email,
-                "password": VALID_TEST_PASSWORD,
+                "password": "weak",  # Triggers 422 validation error
             },
         )
-        # First attempt succeeds; subsequent ones fail with 400.
-        assert response.status_code in (201, 400)
+        # All three attempts fail with 422 and count toward rate limit.
+        assert response.status_code == 422
 
     # Fourth failed attempt should trigger rate limit.
     response = client.post(
         "/api/v1/auth/register",
         json={
             "email": email,
-            "password": VALID_TEST_PASSWORD,
+            "password": "weak",
         },
     )
     assert response.status_code == 429
