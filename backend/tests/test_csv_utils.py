@@ -56,3 +56,37 @@ class TestSanitizeCsvField:
         """A plain number is returned as-is."""
         assert sanitize_csv_field("12345") == "12345"
         assert sanitize_csv_field("3.14159") == "3.14159"
+
+    def test_only_dangerous_char(self):
+        """A string that is only a dangerous character is prefixed."""
+        assert sanitize_csv_field("=") == "'="
+        assert sanitize_csv_field("+") == "'+"
+        assert sanitize_csv_field("-") == "'-"
+        assert sanitize_csv_field("@") == "'@"
+
+    def test_dangerous_char_with_leading_whitespace(self):
+        """Leading whitespace before a dangerous char is preserved and char is still prefixed."""
+        result = sanitize_csv_field("  =HYPERLINK(...)")
+        assert result.startswith("'")
+        assert "=HYPERLINK" in result
+
+    def test_multiple_dangerous_prefixes_prefixed_once(self):
+        """When a string has multiple dangerous prefixes, only one quote prefix is added."""
+        result = sanitize_csv_field("=+-@cmd")
+        assert result.startswith("'")
+        assert result.count("'") == 1
+        assert "=+-@cmd" in result
+
+    def test_non_first_dangerous_char_untouched(self):
+        """A dangerous character appearing after position 0 does not trigger sanitisation."""
+        assert sanitize_csv_field("a=b") == "a=b"
+        assert sanitize_csv_field("x+y") == "x+y"
+        assert sanitize_csv_field("row-1") == "row-1"
+        assert sanitize_csv_field("user@host") == "user@host"
+
+    def test_long_dangerous_formula(self):
+        """A long formula-like string starting with dangerous char is prefixed."""
+        long_formula = "=" + "HYPERLINK(" * 10 + "..." + ")" * 10
+        result = sanitize_csv_field(long_formula)
+        assert result.startswith("'")
+        assert "HYPERLINK" in result
