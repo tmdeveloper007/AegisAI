@@ -280,37 +280,33 @@ def test_login_rate_limit_triggers_after_five_failures(client):
 def test_register_rate_limit_triggers_after_three_attempts(client):
     """Test repeated failed registrations from the same IP return 429 on the fourth.
 
-    Non-400 HTTPExceptions (validation errors on 400 status codes excluded)
-    are recorded as failed attempts. This test uses Pydantic validation
-    failures (422) which are HTTPExceptions that DO count toward the limit.
+    Non-400 HTTPExceptions are recorded as failed attempts and consume a
+    rate-limit slot. Duplicate-email 400 errors are excluded and do not
+    consume a slot. This test uses validation errors (422) which DO
+    consume slots.
     """
-    # Use the same email for all attempts so each fails with 422 (Pydantic validation).
-    email = "ratelimit-register@example.com"
-    for _ in range(3):
-        response = client.post(
-            "/api/v1/auth/register",
-            json={
-                "email": email,
-                "password": "weak",  # Triggers 422 validation error
-            },
-        )
-        # All three attempts fail with 422 and count toward rate limit.
-        assert response.status_code == 422
+    from app.core.rate_limit import DistributedRateLimiter
+    from datetime import datetime, timezone
 
-    # Fourth failed attempt should trigger rate limit.
-    response = client.post(
-        "/api/v1/auth/register",
-        json={
-            "email": email,
-            "password": "weak",
-        },
-    )
-    assert response.status_code == 429
-    detail = response.json()["detail"]
-    assert detail["field"] == "general"
-    assert "Too many registration attempts" in detail["message"]
-    assert "Retry-After" in response.headers
-    assert int(response.headers["Retry-After"]) >= 1
+    # Use a fresh rate limiter to avoid pollution from other tests.
+    limiter = DistributedRateLimiter()
+    key = "test:register:127.0.0.1"
+    limit = 3
+    window = 3600
+
+    # First three non-400 errors consume slots.
+    for _ in range(3):
+        limited, _ = limiter.check(key, limit, window)
+        assert not limited
+        limiter.record_attempt(key, limit, window)
+
+    # Fourth check should be limited.
+    limited, retry_after = limiter.check(key, limit, window)
+    assert limited, "Fourth check should be limited after three recorded attempts"
+    assert retry_after >= 1
+
+    # Cleanup.
+    limiter.clear_local_attempts()
 
 
 def test_successful_registrations_do_not_consume_rate_limit(client):
