@@ -77,3 +77,41 @@ class TestNISTMetadata:
         url = NIST_AI_RMF_METADATA["url"]
         assert url.startswith("https://")
         assert "nist" in url.lower()
+
+    def test_metadata_includes_published_date(self):
+        assert "published" in NIST_AI_RMF_METADATA
+        assert isinstance(NIST_AI_RMF_METADATA["published"], str)
+
+    def test_metadata_includes_scope(self):
+        assert "scope" in NIST_AI_RMF_METADATA
+        assert isinstance(NIST_AI_RMF_METADATA["scope"], str)
+        assert len(NIST_AI_RMF_METADATA["scope"]) > 0
+
+
+class TestMappingDataQuality:
+    """Additional data-quality tests for EU_TO_NIST_MAPPING."""
+
+    @pytest.mark.parametrize("risk_tier", ["MINIMAL", "LIMITED", "HIGH", "UNACCEPTABLE"])
+    def test_rationale_is_substantial(self, risk_tier):
+        rationale = EU_TO_NIST_MAPPING[risk_tier]["rationale"]
+        assert isinstance(rationale, str)
+        assert len(rationale) >= 30
+
+    @pytest.mark.parametrize("risk_tier", ["MINIMAL", "LIMITED", "HIGH", "UNACCEPTABLE"])
+    def test_subcategories_reference_valid_nist_functions(self, risk_tier):
+        primary_funcs = set(EU_TO_NIST_MAPPING[risk_tier]["primary_functions"])
+        for sub in EU_TO_NIST_MAPPING[risk_tier]["subcategories"]:
+            prefix = sub.split()[0]
+            assert prefix in {"GOVERN", "MAP", "MEASURE", "MANAGE"}, \
+                f"Subcategory '{sub}' references unknown function '{prefix}'"
+
+    def test_high_risk_subcategories_reference_all_four_functions(self):
+        subcategories = [s for s in EU_TO_NIST_MAPPING["HIGH"]["subcategories"]]
+        referenced_funcs = {s.split()[0] for s in subcategories}
+        assert referenced_funcs == {"GOVERN", "MAP", "MEASURE", "MANAGE"}
+
+    @pytest.mark.parametrize("risk_tier", ["MINIMAL", "LIMITED", "HIGH", "UNACCEPTABLE"])
+    def test_subcategories_have_em_dash_format(self, risk_tier):
+        for sub in EU_TO_NIST_MAPPING[risk_tier]["subcategories"]:
+            assert " - " in sub, \
+                f"Subcategory '{sub}' should contain ' - ' separator"
