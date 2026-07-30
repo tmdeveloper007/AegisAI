@@ -61,8 +61,8 @@ def get_compliance_badge(
             content={
                 "system_id": system_id,
                 "name": system.name,
-                "risk_level": system.risk_level,
-                "compliance_status": system.compliance_status,
+                "risk_level": system.risk_level.value if system.risk_level is not None else None,
+                "compliance_status": system.compliance_status.value if system.compliance_status is not None else None,
             },
             headers={"Cache-Control": "public, max-age=60"},
         )
