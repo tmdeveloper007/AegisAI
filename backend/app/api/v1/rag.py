@@ -800,14 +800,25 @@ async def query_knowledge_base_stream(
     del request
     try:
         vector_store = load_vector_store(user_id=current_user.id)
-    except FileNotFoundError as exc:
+    except FileNotFoundError:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=str(exc),
+            detail="The AI analysis service is temporarily unavailable. Please try again later.",
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The AI analysis service is temporarily unavailable. Please try again later.",
         )
 
-    retriever = vector_store.as_retriever(search_kwargs={"k": 5})
-    llm_client = LLMClient()
+    try:
+        retriever = vector_store.as_retriever(search_kwargs={"k": 5})
+        llm_client = LLMClient()
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="The AI analysis service is temporarily unavailable. Please try again later.",
+        )
 
     generator = stream_rag_answer(
         question=guarded_question.question,

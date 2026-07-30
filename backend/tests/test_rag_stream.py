@@ -334,6 +334,6 @@ class TestQueryStreamEndpoint:
                     json={"question": "anything"},
                 )
             assert resp.status_code == 503
-            assert "missing" in resp.json()["detail"].lower()
+            assert "unavailable" in resp.json()["detail"].lower()
         finally:
             app.dependency_overrides.pop(get_current_user, None)
