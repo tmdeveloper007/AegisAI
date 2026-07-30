@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 from app.models.document import DocumentType, DocumentStatus
@@ -11,7 +11,7 @@ class DocumentCreate(BaseModel):
     title: str
     document_type: DocumentType
     ai_system_id: Optional[int] = None
-    content: Optional[str] = None
+    content: Optional[str] = Field(None, max_length=50000)
 
 
 class DocumentUpdate(BaseModel):
@@ -21,7 +21,7 @@ class DocumentUpdate(BaseModel):
 
 class DocumentUpdateRequest(BaseModel):
     """Request to update document content only."""
-    content: str
+    content: str = Field(..., max_length=50000)
 
 class DocumentTemplateResponse(BaseModel):
     """Available document template metadata for generation."""
