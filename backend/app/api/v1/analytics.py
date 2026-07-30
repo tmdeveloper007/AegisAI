@@ -158,9 +158,11 @@ def get_system_risk(
     db: Session = Depends(get_db),
 ):
     """Return per-system risk scores for the current user."""
+    # LIMIT 10000 to prevent unbounded result sets on large accounts.
     systems = (
         db.query(AISystem.id, AISystem.name, AISystem.compliance_score, AISystem.risk_level)
         .filter(AISystem.owner_id == current_user.id)
+        .limit(10000)
         .all()
     )
     return [
