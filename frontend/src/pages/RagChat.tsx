@@ -12,6 +12,40 @@ import {
 } from 'lucide-react'
 
 import { useRagStream } from '../hooks/useRagStream'
+import CopyButton from '../components/CopyButton'
+
+/** Render basic markdown as JSX (bold, italic, inline code). */
+function renderMarkdown(text: string): React.ReactNode[] {
+  const lines = text.split('\n')
+  return lines.map((line, lineIndex) => {
+    // Bold: **text**
+    const parts = line.split(/(\*\*[^*]+\*\*|\*[^*]+\*|`[^`]+`)/g).filter(Boolean)
+    return (
+      <span key={lineIndex}>
+        {parts.map((part, i) => {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            return <strong key={i}>{part.slice(2, -2)}</strong>
+          }
+          if (part.startsWith('*') && part.endsWith('*')) {
+            return <em key={i}>{part.slice(1, -1)}</em>
+          }
+          if (part.startsWith('`') && part.endsWith('`')) {
+            return (
+              <code
+                key={i}
+                className="px-1 py-0.5 bg-gray-100 text-pink-700 rounded text-xs font-mono"
+              >
+                {part.slice(1, -1)}
+              </code>
+            )
+          }
+          return part
+        })}
+        {lineIndex < lines.length - 1 && <br />}
+      </span>
+    )
+  })
+}
 
 function getResponseTimeColor(time: number): string {
   if (time < 1) return 'text-green-600 bg-green-50'
@@ -207,7 +241,7 @@ export default function RagChat() {
                         )}
 
                         <p className="text-gray-700 leading-7 whitespace-pre-wrap">
-                          {tokens}
+                          {renderMarkdown(tokens)}
                           {isStreaming && (
                             <span
                               className="inline-block w-2 h-4 bg-primary-600 ml-0.5 align-text-bottom animate-pulse"
@@ -254,14 +288,23 @@ export default function RagChat() {
                               {citations.map((citation, index) => (
                                 <div
                                   key={index}
-                                  className="border border-gray-200 rounded-lg p-3 bg-gray-50"
+                                  className="border border-gray-200 rounded-lg p-3 bg-gray-50 flex items-start justify-between gap-3"
                                 >
-                                  <p className="font-medium text-sm text-gray-900">
-                                    {citation.source}
-                                  </p>
-                                  <p className="text-sm text-gray-600 mt-1">
-                                    {citation.excerpt}
-                                  </p>
+                                  <div className="min-w-0">
+                                    <p className="font-medium text-sm text-gray-900">
+                                      {citation.source}
+                                    </p>
+                                    <p className="text-sm text-gray-600 mt-1">
+                                      {citation.excerpt}
+                                    </p>
+                                  </div>
+                                  <CopyButton
+                                    text={`${citation.source}\n${citation.excerpt}`}
+                                    label="Copy"
+                                    successMessage="Citation copied!"
+                                    iconOnly
+                                    className="flex-shrink-0 mt-1"
+                                  />
                                 </div>
                               ))}
                             </div>
