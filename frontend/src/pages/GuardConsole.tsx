@@ -4,17 +4,21 @@ import {
   Activity,
   AlertCircle,
   Brain,
+  Download,
   Gauge,
   ListChecks,
   Loader2,
   Send,
   ShieldCheck,
 } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
 import CopyButton from '../components/CopyButton'
 import GuardExplanation from '../components/GuardExplanation'
 import {
   guardApi,
+  guardHistoryApi,
   type GuardExplainResponse,
+  type GuardScanLog,
   type GuardScanResponse,
 } from '../services/api'
 
@@ -71,6 +75,17 @@ export default function GuardConsole() {
   const [scannedAt, setScannedAt] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [historyDecision, setHistoryDecision] = useState<string>('all')
+
+  const { data: historyData, isLoading: historyLoading } = useQuery({
+    queryKey: ['guard-history', historyDecision],
+    queryFn: () =>
+      guardHistoryApi.list({
+        decision: historyDecision !== 'all' ? historyDecision : undefined,
+        limit: 20,
+      }),
+    retry: 1,
+  })
 
   const metrics = useMemo(
     () => buildMetrics(result, scannedAt),
@@ -415,6 +430,94 @@ export default function GuardConsole() {
           </aside>
         </div>
       )}
+
+      {/* Scan history section */}
+      <section className="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm overflow-hidden">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 dark:text-white">Scan history</h2>
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Recent guard scan events
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <select
+              value={historyDecision}
+              onChange={(e) => setHistoryDecision(e.target.value)}
+              className="rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 focus:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="all">All decisions</option>
+              <option value="allow">Allow</option>
+              <option value="sanitize">Sanitize</option>
+              <option value="block">Block</option>
+            </select>
+            <a
+              href="/api/v1/guard/logs/export?format=csv"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+            >
+              <Download className="w-4 h-4" />
+              Export CSV
+            </a>
+          </div>
+        </div>
+
+        {historyLoading ? (
+          <div className="flex items-center gap-3 px-5 py-6 text-gray-500 dark:text-gray-400">
+            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="text-sm">Loading scan history...</span>
+          </div>
+        ) : historyData?.items && historyData.items.length > 0 ? (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
+                <tr>
+                  <th className="px-5 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Scanned at</th>
+                  <th className="px-5 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Decision</th>
+                  <th className="px-5 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Confidence</th>
+                  <th className="px-5 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Patterns</th>
+                  <th className="px-5 py-3 text-left font-medium text-gray-500 dark:text-gray-400">Reasoning</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+                {historyData.items.map((log: GuardScanLog, idx: number) => (
+                  <tr key={log.id ?? idx} className="hover:bg-gray-50 dark:hover:bg-gray-900/50">
+                    <td className="px-5 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                      {log.scanned_at ? formatRelativeTime(new Date(log.scanned_at)) : '-'}
+                    </td>
+                    <td className="px-5 py-3">
+                      <span
+                        className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wide ${decisionBadgeClass(log.decision)}`}
+                      >
+                        {log.decision}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3 text-gray-700 dark:text-gray-300">
+                      {(log.confidence * 100).toFixed(1)}%
+                    </td>
+                    <td className="px-5 py-3">
+                      {log.matched_patterns && log.matched_patterns.length > 0 ? (
+                        <span className="inline-flex items-center rounded-full bg-red-50 dark:bg-red-900/30 px-2.5 py-0.5 text-xs font-medium text-red-700 dark:text-red-400">
+                          {log.matched_patterns.length} pattern{log.matched_patterns.length !== 1 ? 's' : ''}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400 dark:text-gray-500">None</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-gray-600 dark:text-gray-400 max-w-xs truncate">
+                      {log.reasoning}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center gap-3 px-5 py-10 text-gray-500 dark:text-gray-400">
+            <Activity className="w-8 h-8" />
+            <p className="text-sm">No scan history found.</p>
+          </div>
+        )}
+      </section>
     </div>
   )
 }
