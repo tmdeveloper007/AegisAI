@@ -409,11 +409,14 @@ def ingest_documents(
 
         try:
             chunks = _valid_text_chunks(saved_paths)
-        except ValueError as exc:
+        except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=str(exc),
-            ) from exc
+                detail=(
+                    "The uploaded PDF could not be parsed. "
+                    "Please ensure the file is not password-protected, corrupted, or a scanned image."
+                ),
+            ) from None
 
         if not chunks:
             raise HTTPException(

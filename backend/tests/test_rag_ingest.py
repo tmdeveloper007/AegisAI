@@ -182,8 +182,30 @@ class TestRagIngest:
     # Downstream failures
     # ------------------------------------------------------------------
 
-    @patch(PATCH_CREATE_VS)
     @patch(PATCH_LOAD_DOCS)
+    def test_malformed_pdf_returns_clean_400(self, mock_load, client, mock_rag_user):
+        """
+        5b. A malformed/unparseable PDF should return 400 with a generic message.
+        The raw exception detail must NOT be exposed to the client.
+        """
+        mock_load.side_effect = ValueError(
+            "Failed to parse PDF 'broken.pdf': PyPDFReader Error: no pages found"
+        )
+
+        with patch(PATCH_AUTH, return_value=_mock_current_user()):
+            response = client.post(
+                "/api/v1/rag/ingest",
+                files={"files": _make_pdf_upload("broken.pdf")},
+            )
+
+        assert response.status_code == 400
+        detail = response.json()["detail"]
+        # Must be a generic message, not the raw parser exception
+        assert "PyPDF" not in detail
+        assert "no pages found" not in detail
+        assert "broken.pdf" not in detail
+        assert "could not be parsed" in detail.lower() or "password" in detail.lower()
+
     def test_faiss_build_failure_returns_503(self, mock_load, mock_create, client, mock_rag_user):
         """
         6. If the FAISS build step raises an exception, the endpoint should
