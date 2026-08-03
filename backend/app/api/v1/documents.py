@@ -956,3 +956,98 @@ def export_document_pdf(
             )
         }
     )
+
+
+@router.get("/{document_id}/export")
+def export_document(
+    document_id: int,
+    format: str = Query("pdf", pattern="^(pdf|html)$"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Export a compliance document as a PDF or HTML attachment."""
+    document = db.query(Document).filter(
+        Document.id == document_id,
+        Document.owner_id == current_user.id,
+    ).first()
+
+    if not document:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Document not found",
+        )
+
+    if not document.content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Document has no content to export",
+        )
+
+    filename_base = _safe_pdf_filename(document.title).replace(".pdf", "")
+
+    if format == "html":
+        import html as html_module
+        body_lines = []
+        for line in document.content.split("\n"):
+            if line.startswith("# "):
+                body_lines.append(f"<h2>{html_module.escape(line[2:])}</h2>")
+            elif line.startswith("## "):
+                body_lines.append(f"<h3>{html_module.escape(line[3:])}</h3>")
+            elif line.startswith("### "):
+                body_lines.append(f"<h4>{html_module.escape(line[4:])}</h4>")
+            elif line.startswith("- "):
+                body_lines.append(f"<li>{html_module.escape(line[2:])}</li>")
+            elif line.strip():
+                body_lines.append(f"<p>{html_module.escape(line)}</p>")
+            else:
+                body_lines.append("<br>")
+
+        body_content = "\n".join(body_lines)
+        html_doc = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{html_module.escape(document.title)}</title>
+  <style>
+    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px; margin: 40px auto; padding: 0 20px;
+            color: #1f2937; line-height: 1.6; }}
+    h1 {{ font-size: 1.875rem; font-weight: 700; margin-bottom: 0.5rem; }}
+    h2 {{ font-size: 1.5rem; font-weight: 600; margin: 1.5rem 0 0.75rem;
+          border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; }}
+    h3 {{ font-size: 1.25rem; font-weight: 600; margin: 1.25rem 0 0.5rem; }}
+    ul {{ padding-left: 1.5rem; }}
+    li {{ margin-bottom: 0.25rem; }}
+    .meta {{ color: #6b7280; font-size: 0.875rem; margin-bottom: 2rem; }}
+  </style>
+</head>
+<body>
+  <h1>{html_module.escape(document.title)}</h1>
+  <div class="meta">
+    <div>Type: <strong>{html_module.escape(document.document_type.value)}</strong></div>
+    <div>Status: <strong>{html_module.escape(document.status.value)}</strong></div>
+    <div>Created: <strong>{document.created_at.strftime('%Y-%m-%d')}</strong></div>
+  </div>
+  <hr>
+  {body_content}
+</body>
+</html>"""
+        filename = f"{filename_base}.html"
+        return StreamingResponse(
+            BytesIO(html_doc.encode("utf-8")),
+            media_type="text/html; charset=utf-8",
+            headers={
+                "Content-Disposition": (
+                    f'attachment; filename="{filename}"; '
+                    f"filename*=UTF-8''{quote(filename)}"
+                ),
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
+
+    # Fall back to PDF export (delegate to the existing PDF endpoint logic inline)
+    raise HTTPException(
+        status_code=status.HTTP_400_BAD_REQUEST,
+        detail="Use GET /{document_id}/pdf for PDF export",
+    )

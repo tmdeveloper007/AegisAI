@@ -343,17 +343,49 @@ export default function Documents() {
 
                   <button
                     onClick={() => {
-                      // Download as text file
-                      const blob = new Blob([doc.content || ''], {
-                        type: 'text/markdown',
+                      // Download as HTML file
+                      const content = doc.content || ''
+                      const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${doc.title}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #1f2937; line-height: 1.6; }
+    h1 { font-size: 1.875rem; font-weight: 700; margin-bottom: 0.5rem; color: #111827; }
+    h2 { font-size: 1.5rem; font-weight: 600; margin: 1.5rem 0 0.75rem; color: #1f2937; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.5rem; }
+    h3 { font-size: 1.25rem; font-weight: 600; margin: 1.25rem 0 0.5rem; color: #374151; }
+    ul { padding-left: 1.5rem; }
+    li { margin-bottom: 0.25rem; }
+    code { background: #f3f4f6; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.875rem; }
+    pre { background: #f3f4f6; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+    .meta { color: #6b7280; font-size: 0.875rem; margin-bottom: 2rem; }
+  </style>
+</head>
+<body>
+  <h1>${doc.title}</h1>
+  <div class="meta">
+    <div>Type: <strong>${doc.document_type}</strong></div>
+    <div>Status: <strong>${doc.status}</strong></div>
+    <div>Created: <strong>${new Date(doc.created_at).toLocaleDateString()}</strong></div>
+  </div>
+  <hr>
+  <div>${content.replace(/\n/g, '<br>')}</div>
+</body>
+</html>`
+                      const blob = new Blob([htmlContent], {
+                        type: 'text/html;charset=utf-8',
                       })
                       const url = URL.createObjectURL(blob)
                       const a = document.createElement('a')
                       a.href = url
-                      a.download = `${doc.title}.md`
+                      a.download = `${doc.title}.html`
                       a.click()
+                      URL.revokeObjectURL(url)
                     }}
                     className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100"
+                    title="Download as HTML"
                   >
                     <Download className="w-5 h-5" />
                   </button>
