@@ -8,6 +8,7 @@ import {
   Send,
   Sparkles,
   Square,
+  Trash2,
   User,
 } from 'lucide-react'
 
@@ -23,6 +24,7 @@ export default function RagChat() {
   const [question, setQuestion] = useState('')
   const [submittedQuestion, setSubmittedQuestion] = useState('')
   const [validationError, setValidationError] = useState<string | null>(null)
+  const [showClearConfirm, setShowClearConfirm] = useState(false)
 
   const {
     status,
@@ -89,21 +91,70 @@ export default function RagChat() {
     URL.revokeObjectURL(url)
   }
 
+  const handleClearChat = () => {
+    setSubmittedQuestion('')
+    setValidationError(null)
+    setShowClearConfirm(false)
+    stop()
+  }
+
   return (
     <div className="h-[calc(100vh-2rem)] md:h-[calc(100vh-4rem)] flex flex-col bg-white rounded-xl border border-gray-200 overflow-hidden">
       <div className="px-4 sm:px-6 py-4 border-b border-gray-200 bg-white">
-        <div className="flex items-center gap-3">
-          <div className="p-2 sm:p-3 bg-primary-50 rounded-xl">
-            <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600" />
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="p-2 sm:p-3 bg-primary-50 rounded-xl">
+              <Bot className="w-5 h-5 sm:w-6 sm:h-6 text-primary-600" />
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Chatbot</h1>
+              <p className="text-sm sm:text-base text-gray-600">
+                Ask regulatory and compliance questions with source-backed answers
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Chatbot</h1>
-            <p className="text-sm sm:text-base text-gray-600">
-              Ask regulatory and compliance questions with source-backed answers
-            </p>
-          </div>
+          {(submittedQuestion || hasAnswer || isStreaming) && (
+            <button
+              type="button"
+              onClick={() => setShowClearConfirm(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg border border-gray-200 hover:border-red-200 transition-colors"
+              title="Clear chat"
+            >
+              <Trash2 className="w-4 h-4" />
+              Clear chat
+            </button>
+          )}
         </div>
       </div>
+
+      {showClearConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-2">
+              Clear conversation?
+            </h2>
+            <p className="text-sm text-gray-600 mb-5">
+              This will reset the chat history. This action cannot be undone.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowClearConfirm(false)}
+                className="px-4 py-2 text-sm text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleClearChat}
+                className="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-8">
